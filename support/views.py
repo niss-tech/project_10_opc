@@ -1,16 +1,17 @@
 from django.shortcuts import render
 from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
-from .models import Project, User
-from .serializers import ProjectSerializer
+from .models import Project, User, Contributor
+from .serializers import ProjectSerializer, RegisterSerializer, UserSerializer, ContributorSerializer
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from .serializers import RegisterSerializer, UserSerializer
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from .permissions import IsProjectAuthor
 
 class ProjectViewSet(ModelViewSet):
     queryset = Project.objects.all()
     serializer_class = ProjectSerializer
+    
 
 
 
@@ -31,3 +32,9 @@ class RegisterView(APIView):
 class UserViewSet(ReadOnlyModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
+
+
+class ContributorViewSet(ModelViewSet):
+    queryset = Contributor.objects.all()
+    serializer_class = ContributorSerializer
+    permission_classes = [IsAuthenticated, IsProjectAuthor]
