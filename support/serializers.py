@@ -10,6 +10,8 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class ProjectSerializer(serializers.ModelSerializer):
+    author = serializers.ReadOnlyField(source='author.username')
+    
     class Meta:
         model = Project
         fields = ['id', 'title', 'description', 'type', 'author', 'created_time']

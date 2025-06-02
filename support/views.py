@@ -8,12 +8,15 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from .permissions import IsProjectAuthor
 
+
 class ProjectViewSet(ModelViewSet):
     queryset = Project.objects.all()
     serializer_class = ProjectSerializer
-    
+    permission_classes = [IsAuthenticated]
 
-
+    def perform_create(self, serializer):
+        project = serializer.save(author=self.request.user)
+        Contributor.objects.create(user=self.request.user, project=project, role="Author")
 
 class RegisterView(APIView):
 
