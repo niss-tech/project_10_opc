@@ -1,5 +1,5 @@
 from rest_framework.permissions import BasePermission
-from .models import Project
+from .models import Project, Contributor
 
 class IsProjectAuthor(BasePermission):
     """
@@ -29,3 +29,42 @@ class IsProjectAuthor(BasePermission):
     def has_object_permission(self, request, view, obj):
         # Seul l'auteur du projet peut modifier/supprimer un Contributor
         return obj.project.author == request.user
+
+
+class IsContributor(BasePermission):
+    """
+    Vérifie que l'utilisateur est contributeur du projet concerné
+    """
+
+    def has_permission(self, request, view):
+        if request.method in ('GET', 'HEAD', 'OPTIONS'):
+            # On autorise si l'utilisateur est contributeur d'au moins un projet
+            return Contributor.objects.filter(user=request.user).exists()
+
+        if request.method == 'POST':
+            project_id = request.data.get('project')
+            if not project_id:
+                return False
+            return Contributor.objects.filter(user=request.user, project_id=project_id).exists()
+
+        return True
+
+
+    def has_object_permission(self, request, view, obj):
+        return Contributor.objects.filter(user=request.user, project=obj.project).exists()
+    
+
+
+class IsAuthorOrReadOnly(BasePermission):
+    """
+    Seul l'auteur de l'objet peut le modifier ou le supprimer.
+    Lecture autorisée pour les autres.
+    """
+
+    def has_permission(self, request, view):
+        return request.user and request.user.is_authenticated
+
+    def has_object_permission(self, request, view, obj):
+        if request.method in ('GET', 'HEAD', 'OPTIONS'):
+            return True
+        return obj.author == request.user
