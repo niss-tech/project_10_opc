@@ -32,9 +32,22 @@ class IssueSerializer(serializers.ModelSerializer):
             'id', 'title', 'description', 'tag', 'priority', 'status',
             'project', 'author', 'assignee_user', 'created_time'
         ]
+    
+    def validate(self, data):
+        # On vérifie que assignee_user est bien contributeur du projet
+        project = data.get('project')
+        assignee_user = data.get('assignee_user')
+
+        if not Contributor.objects.filter(user=assignee_user, project=project).exists():
+            raise serializers.ValidationError("L'utilisateur assigné doit être un contributeur du projet.")
+        
+        return data
 
 
 class CommentSerializer(serializers.ModelSerializer):
+    author = serializers.ReadOnlyField(source='author.username')
+    uuid = serializers.ReadOnlyField()
+
     class Meta:
         model = Comment
         fields = ['id', 'uuid', 'description', 'author', 'issue', 'created_time']

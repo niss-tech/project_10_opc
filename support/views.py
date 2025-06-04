@@ -1,18 +1,23 @@
 from django.shortcuts import render
 from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
-from .models import Project, User, Contributor, Issue
-from .serializers import ProjectSerializer, RegisterSerializer, UserSerializer, ContributorSerializer, IssueSerializer
+from .models import Project, User, Contributor, Issue, Comment
+from .serializers import ProjectSerializer, RegisterSerializer, UserSerializer, ContributorSerializer, IssueSerializer, CommentSerializer
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated, AllowAny
-from .permissions import IsProjectAuthor, IsContributor, IsAuthorOrReadOnly
+from .permissions import IsProjectAuthor, IsContributor, IsAuthorOrReadOnly, IsContributorViaIssue
 
 
 class ProjectViewSet(ModelViewSet):
-    queryset = Project.objects.all()
     serializer_class = ProjectSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsContributor]
+
+    def get_queryset(self):
+        user = self.request.user
+        # Retourne les projets où je suis contributeur
+        projects_ids = Contributor.objects.filter(user=user).values_list('project_id', flat=True)
+        return Project.objects.filter(id__in=projects_ids)
 
     def perform_create(self, serializer):
         project = serializer.save(author=self.request.user)
@@ -44,9 +49,51 @@ class ContributorViewSet(ModelViewSet):
 
 
 class IssueViewSet(ModelViewSet):
-    queryset = Issue.objects.all()
     serializer_class = IssueSerializer
     permission_classes = [IsAuthenticated, IsContributor, IsAuthorOrReadOnly]
+
+    def get_queryset(self):
+        user = self.request.user
+        project_id = self.request.query_params.get('project')
+
+        if project_id:
+            if Contributor.objects.filter(user=user, project_id=project_id).exists():
+                return Issue.objects.filter(project_id=project_id)
+            else:
+                return Issue.objects.none()
+        else:
+            projects_ids = Contributor.objects.filter(user=user).values_list('project_id', flat=True)
+            return Issue.objects.filter(project_id__in=projects_ids)
+
+    def perform_create(self, serializer):
+        serializer.save(author=self.request.user)
+
+
+
+class CommentViewSet(ModelViewSet):
+    serializer_class = CommentSerializer
+    permission_classes = [IsAuthenticated, IsContributorViaIssue, IsAuthorOrReadOnly]
+
+    def get_queryset(self):
+        user = self.request.user
+        issue_id = self.request.query_params.get('issue')
+
+        if issue_id:
+            # Vérifier que le user est contributeur du projet lié à l'issue
+            try:
+                issue = Issue.objects.get(id=issue_id)
+            except Issue.DoesNotExist:
+                return Comment.objects.none()
+
+            if Contributor.objects.filter(user=user, project=issue.project).exists():
+                return Comment.objects.filter(issue=issue)
+            else:
+                return Comment.objects.none()
+        else:
+            # Si pas de paramètre → retourner les comments des issues des projets où le user est contributeur
+            projects_ids = Contributor.objects.filter(user=user).values_list('project_id', flat=True)
+            issues_ids = Issue.objects.filter(project_id__in=projects_ids).values_list('id', flat=True)
+            return Comment.objects.filter(issue_id__in=issues_ids)
 
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)

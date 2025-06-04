@@ -1,5 +1,5 @@
 from rest_framework.permissions import BasePermission
-from .models import Project, Contributor
+from .models import Project, Contributor, Issue
 
 class IsProjectAuthor(BasePermission):
     """
@@ -68,3 +68,25 @@ class IsAuthorOrReadOnly(BasePermission):
         if request.method in ('GET', 'HEAD', 'OPTIONS'):
             return True
         return obj.author == request.user
+
+class IsContributorViaIssue(BasePermission):
+    """
+    Vérifie que l'utilisateur est contributeur du projet de l'issue liée au commentaire.
+    """
+
+    def has_permission(self, request, view):
+        if request.method in ('POST', 'GET', 'HEAD', 'OPTIONS'):
+            issue_id = request.data.get('issue') or request.query_params.get('issue')
+            if not issue_id:
+                return False  # Pas d'issue fourni → bloqué
+            try:
+                issue = Issue.objects.get(id=issue_id)
+            except Issue.DoesNotExist:
+                return False
+            return Contributor.objects.filter(user=request.user, project=issue.project).exists()
+
+        return True
+
+    def has_object_permission(self, request, view, obj):
+        # obj = Comment → on regarde l'issue liée → le projet de l'issue
+        return Contributor.objects.filter(user=request.user, project=obj.issue.project).exists()
