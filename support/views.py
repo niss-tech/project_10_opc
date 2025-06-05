@@ -11,17 +11,20 @@ from .permissions import IsProjectAuthor, IsContributor, IsAuthorOrReadOnly, IsC
 
 class ProjectViewSet(ModelViewSet):
     serializer_class = ProjectSerializer
-    permission_classes = [IsAuthenticated, IsContributor]
+    permission_classes = [IsAuthenticated]  # On ne met pas IsContributor ici
 
     def get_queryset(self):
         user = self.request.user
-        # Retourne les projets où je suis contributeur
+        # On retourne uniquement les projets où l'utilisateur est contributeur
         projects_ids = Contributor.objects.filter(user=user).values_list('project_id', flat=True)
         return Project.objects.filter(id__in=projects_ids)
 
     def perform_create(self, serializer):
+        # Lorsqu'on crée un projet, l'auteur est l'utilisateur connecté
         project = serializer.save(author=self.request.user)
+        # On ajoute automatiquement l'utilisateur comme contributeur (rôle "Author")
         Contributor.objects.create(user=self.request.user, project=project, role="Author")
+
 
 class RegisterView(APIView):
 
@@ -43,9 +46,24 @@ class UserViewSet(ReadOnlyModelViewSet):
 
 
 class ContributorViewSet(ModelViewSet):
-    queryset = Contributor.objects.all()
     serializer_class = ContributorSerializer
     permission_classes = [IsAuthenticated, IsProjectAuthor]
+
+    def get_queryset(self):
+        user = self.request.user
+        project_id = self.request.query_params.get('project')
+
+        if project_id:
+            # Vérifier que le user est contributeur du projet demandé
+            if Contributor.objects.filter(user=user, project_id=project_id).exists():
+                return Contributor.objects.filter(project_id=project_id)
+            else:
+                return Contributor.objects.none()
+        else:
+            # Retourner les contributors des projets où le user est contributeur
+            projects_ids = Contributor.objects.filter(user=user).values_list('project_id', flat=True)
+            return Contributor.objects.filter(project_id__in=projects_ids)
+
 
 
 class IssueViewSet(ModelViewSet):

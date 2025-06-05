@@ -75,17 +75,24 @@ class IsContributorViaIssue(BasePermission):
     """
 
     def has_permission(self, request, view):
+        if request.method in ('PUT', 'PATCH', 'DELETE'):
+            return True
+
         if request.method in ('POST', 'GET', 'HEAD', 'OPTIONS'):
             issue_id = request.data.get('issue') or request.query_params.get('issue')
-            if not issue_id:
-                return False  # Pas d'issue fourni → bloqué
-            try:
-                issue = Issue.objects.get(id=issue_id)
-            except Issue.DoesNotExist:
-                return False
-            return Contributor.objects.filter(user=request.user, project=issue.project).exists()
+
+            if issue_id:
+                try:
+                    issue = Issue.objects.get(id=issue_id)
+                except Issue.DoesNotExist:
+                    return False
+                return Contributor.objects.filter(user=request.user, project=issue.project).exists()
+            else:
+                # Si pas d'issue précisée (GET /comments/) → vérifier que le user est contributeur d'au moins un projet
+                return Contributor.objects.filter(user=request.user).exists()
 
         return True
+
 
     def has_object_permission(self, request, view, obj):
         # obj = Comment → on regarde l'issue liée → le projet de l'issue

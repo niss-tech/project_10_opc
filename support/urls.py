@@ -6,7 +6,7 @@ from .views import RegisterView
 router = DefaultRouter()
 router.register(r'projects', ProjectViewSet, basename='project')
 router.register(r'users', UserViewSet)
-router.register(r'contributors', ContributorViewSet)
+router.register(r'contributors', ContributorViewSet, basename='contributor')
 router.register(r'issues', IssueViewSet, basename='issue')
 router.register(r'comments', CommentViewSet, basename='comment')
 
