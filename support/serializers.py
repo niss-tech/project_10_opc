@@ -10,6 +10,7 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class ProjectSerializer(serializers.ModelSerializer):
+    # On affiche le username de l'auteur en lecture seule
     author = serializers.ReadOnlyField(source='author.username')
 
     class Meta:
@@ -33,6 +34,7 @@ class IssueSerializer(serializers.ModelSerializer):
             'project', 'author', 'assignee_user', 'created_time'
         ]
 
+    # Validation personnalisée pour vérifier que l'assignee_user est bien un contributeur du projet
     def validate(self, data):
         # On récupère l'instance existante si c'est un PATCH / update
         instance = getattr(self, 'instance', None)
@@ -40,6 +42,7 @@ class IssueSerializer(serializers.ModelSerializer):
         project = data.get('project', getattr(instance, 'project', None))
         assignee_user = data.get('assignee_user', getattr(instance, 'assignee_user', None))
 
+        # On vérifie que l'utilisateur assigné est bien contributeur du projet
         if not Contributor.objects.filter(user=assignee_user, project=project).exists():
             raise serializers.ValidationError("L'utilisateur assigné doit être un contributeur du projet.")
         
@@ -68,6 +71,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         model = User
         fields = ['username', 'password', 'password2', 'email', 'age', 'can_be_contacted', 'can_data_be_shared']
 
+    # Validation pour vérifier que les mots de passe correspondent et que l'utilisateur a ≥ 15 ans
     def validate(self, data):
         if data['password'] != data['password2']:
             raise serializers.ValidationError("Les mots de passe ne correspondent pas.")
@@ -75,6 +79,7 @@ class RegisterSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Vous devez avoir au moins 15 ans pour vous inscrire.")
         return data
 
+    # Méthode de création de l'utilisateur (on enlève password2 qui ne sert qu'à la validation)
     def create(self, validated_data):
         validated_data.pop('password2')
         user = User.objects.create_user(**validated_data)

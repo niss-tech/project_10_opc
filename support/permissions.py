@@ -1,12 +1,12 @@
 from rest_framework.permissions import BasePermission
 from .models import Project, Contributor, Issue
 
-class IsProjectAuthor(BasePermission):
-    """
-    Autorise uniquement l'auteur du projet à modifier les contributeurs.
-    Les contributeurs peuvent voir la liste (GET).
-    """
 
+# Permission : IsProjectAuthor
+# Autorise uniquement l'auteur du projet à modifier les contributeurs.
+# Tous les contributeurs peuvent voir la liste (GET)
+class IsProjectAuthor(BasePermission):
+   
     def has_permission(self, request, view):
         # GET → autorisé pour tous les utilisateurs authentifiés
         if request.method in ('GET', 'HEAD', 'OPTIONS'):
@@ -30,17 +30,16 @@ class IsProjectAuthor(BasePermission):
         # Seul l'auteur du projet peut modifier/supprimer un Contributor
         return obj.project.author == request.user
 
-
+# Permission : IsContributor
+# Vérifie que l'utilisateur est contributeur du projet concerné.
 class IsContributor(BasePermission):
-    """
-    Vérifie que l'utilisateur est contributeur du projet concerné
-    """
 
     def has_permission(self, request, view):
         if request.method in ('GET', 'HEAD', 'OPTIONS'):
             # On autorise si l'utilisateur est contributeur d'au moins un projet
             return Contributor.objects.filter(user=request.user).exists()
 
+        # POST → vérifier que l'utilisateur est contributeur du projet indiqué
         if request.method == 'POST':
             project_id = request.data.get('project')
             if not project_id:
@@ -51,15 +50,14 @@ class IsContributor(BasePermission):
 
 
     def has_object_permission(self, request, view, obj):
+        # L'utilisateur doit être contributeur du projet lié à l'objet
         return Contributor.objects.filter(user=request.user, project=obj.project).exists()
     
 
-
+# Permission : IsAuthorOrReadOnly
+# Seul l'auteur de l'objet peut le modifier ou le supprimer.
+# Les autres utilisateurs peuvent le lire.
 class IsAuthorOrReadOnly(BasePermission):
-    """
-    Seul l'auteur de l'objet peut le modifier ou le supprimer.
-    Lecture autorisée pour les autres.
-    """
 
     def has_permission(self, request, view):
         return request.user and request.user.is_authenticated
@@ -69,16 +67,17 @@ class IsAuthorOrReadOnly(BasePermission):
             return True
         return obj.author == request.user
 
+
+# Permission : IsContributorViaIssue
+# Vérifie que l'utilisateur est contributeur du projet de l'issue liée au commentaire.
 class IsContributorViaIssue(BasePermission):
-    """
-    Vérifie que l'utilisateur est contributeur du projet de l'issue liée au commentaire.
-    """
 
     def has_permission(self, request, view):
         if request.method in ('PUT', 'PATCH', 'DELETE'):
             return True
 
         if request.method in ('POST', 'GET', 'HEAD', 'OPTIONS'):
+            # On récupère l'ID de l'issue dans les paramètres ou dans le corps de la requête
             issue_id = request.data.get('issue') or request.query_params.get('issue')
 
             if issue_id:
@@ -86,6 +85,7 @@ class IsContributorViaIssue(BasePermission):
                     issue = Issue.objects.get(id=issue_id)
                 except Issue.DoesNotExist:
                     return False
+                # On vérifie que l'utilisateur est contributeur du projet de l'issue
                 return Contributor.objects.filter(user=request.user, project=issue.project).exists()
             else:
                 # Si pas d'issue précisée (GET /comments/) → vérifier que le user est contributeur d'au moins un projet
